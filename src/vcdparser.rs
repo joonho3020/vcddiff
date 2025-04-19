@@ -30,6 +30,9 @@ pub enum FourStateBit {
     ONE,
     X,
     Z,
+    MultiHex(String),  // For multi-bit hex values (0s and 1s)
+    MultiX(String),    // For multi-bit X values
+    MultiZ(String),    // For multi-bit Z values
 }
 
 impl FourStateBit {
@@ -40,6 +43,53 @@ impl FourStateBit {
             'x' => Self::X,
             'z' => Self::Z,
             _ => Self::X,
+        }
+    }
+
+    fn bin_to_hex(bin: &str) -> String {
+        // Pad the binary string to make its length a multiple of 4
+        let padding = (4 - (bin.len() % 4)) % 4;
+        let padded_bin = format!("{:0>width$}", bin, width = bin.len() + padding);
+
+        // Convert each group of 4 bits to a hex digit
+        let hex_value: String = padded_bin.chars()
+            .collect::<Vec<char>>()
+            .chunks(4)
+            .map(|chunk| {
+                let bin_digit: String = chunk.iter().rev().collect();
+                let decimal = u8::from_str_radix(&bin_digit, 2).unwrap_or(0);
+                format!("{:X}", decimal)
+            })
+            .collect();
+
+        format!("0x{}", hex_value)
+    }
+
+    pub fn from_string(s: String) -> Self {
+        if s.len() == 1 {
+            return Self::from_char(s.chars().next().unwrap());
+        }
+
+        // Check if the string contains only specific characters
+        let contains_only = |s: &str, chars: &[char]| -> bool {
+            s.chars().all(|c| chars.contains(&c))
+        };
+
+        if contains_only(&s, &['0', '1']) {
+            Self::MultiHex(Self::bin_to_hex(&s))
+        } else if contains_only(&s, &['x', 'X']) {
+            Self::MultiX(s)
+        } else if contains_only(&s, &['z', 'Z']) {
+            Self::MultiZ(s)
+        } else {
+            // If mixed, prioritize in order: X > Z > Hex
+            if s.chars().any(|c| c == 'x' || c == 'X') {
+                Self::MultiX(s)
+            } else if s.chars().any(|c| c == 'z' || c == 'Z') {
+                Self::MultiZ(s)
+            } else {
+                Self::MultiHex(Self::bin_to_hex(&s))
+            }
         }
     }
 
@@ -180,8 +230,6 @@ impl WaveformDB {
                 Some(idx) => {
                     for elemidx in 0..idx.elements {
                         let signal_path: Vec<String> = _signal_name.split('.').map(|s| s.to_string()).collect();
-                        let name = signal_path.last().unwrap().clone();
-
                         let sig_val = loaded_signal.get_value_at(&idx, elemidx);
                         let numbits = match sig_val.bits() {
                             Some(x) => x,
@@ -195,24 +243,14 @@ impl WaveformDB {
                         };
                         let bits_array: Vec<char> = bits.chars().rev().collect();
                         assert!(numbits == bits_array.len() as u32);
-                        if numbits == 1 {
-                            let val = FourStateBit::from_char(bits_array[0]);
-                            ret.insert(WaveformSignal::new(signal_path), val);
+
+                        // Store the entire signal value as one entry
+                        let val = if numbits == 1 {
+                            FourStateBit::from_char(bits_array[0])
                         } else {
-                            for bit in 0..numbits {
-                                let val = FourStateBit::from_char(bits_array[bit as usize]);
-                                let index = format!("[{}]", bit);
-
-                                let mut name_bit = name.clone();
-                                name_bit.push_str(&index);
-
-                                let mut sp = signal_path.clone();
-                                sp.pop();
-                                sp.push(name_bit);
-
-                                ret.insert(WaveformSignal::new(sp), val);
-                            }
-                        }
+                            FourStateBit::from_string(bits.chars().rev().collect())
+                        };
+                        ret.insert(WaveformSignal::new(signal_path), val);
                     }
                 }
                 _ => {}
