@@ -120,20 +120,8 @@ fn main() {
             }
         }
 
-        // Check for signals that only exist in the second file
-        for (signal2, value2) in signals2.iter() {
-            let signal_path = signal2.to_string();
-            if !signal_path.starts_with(scope_prefix) {
-                continue;
-            }
-
-            if !signals1.contains_key(signal2) && !first_divergence.contains_key(signal2) {
-                println!("Signal '{}' only exists in second file", signal_path);
-                first_divergence.insert(
-                    signal2.clone(),
-                    (cycle, FourStateBit::X, value2.clone())
-                );
-            }
+        if first_divergence.len() > 100 {
+            break;
         }
     }
     pb.finish();
