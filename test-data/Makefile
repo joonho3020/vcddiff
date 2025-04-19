@@ -2,8 +2,8 @@ IVERILOG = iverilog
 VVP = vvp
 
 # Source files
-GCD_SRC = gcd.v gcd_tb.v
-GCD_BUGGY_SRC = gcd_buggy.v gcd_buggy_tb.v
+GCD_SRC = golden/gcd.v golden/gcd_tb.v
+GCD_BUGGY_SRC = buggy/gcd_buggy.v buggy/gcd_buggy_tb.v
 
 # Output files
 GCD_OUT = gcd_sim

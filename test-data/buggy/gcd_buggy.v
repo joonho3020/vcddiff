@@ -1,4 +1,4 @@
-module gcd_buggy (
+module gcd (
     input wire clk,
     input wire reset,
     input wire start,
@@ -25,7 +25,7 @@ module gcd_buggy (
                 done <= 0;
             end else if (working) begin
                 if (a_reg == 0) begin
-                    result <= b_reg;
+                    result <= b_reg + 1; // Bug: Incorrectly adds 1
                     done <= 1;
                     working <= 0;
                 end else if (b_reg == 0) begin

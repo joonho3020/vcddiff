@@ -9,3 +9,4 @@ indexmap = "2.9.0"
 indicatif = "0.17.11"
 itertools = "0.14.0"
 clap = { version = "4.5.30", features = ["derive"] }
+gag = "1.0.0"

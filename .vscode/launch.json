@@ -1,0 +1,39 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'vcddiff'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=vcddiff",
+                    "--package=vcddiff"
+                ],
+                "filter": {
+                    "name": "vcddiff",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "--vcd1",
+                "test-data/gcd.vcd",
+                "--vcd2",
+                "test-data/gcd_buggy.vcd",
+                "--clock1",
+                "gcd_tb.clk",
+                "--reset1",
+                "gcd_tb.reset",
+                "--clock2",
+                "gcd_buggy_tb.clk",
+                "--reset2",
+                "gcd_buggy_tb.reset"
+            ],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

@@ -306,6 +306,9 @@ impl WaveformDB {
                             last_value = current_value;
                         }
                         current_offset += 1;
+                        if idx.next_index.is_none() {
+                            break;
+                        }
                     }
                     return TimeStampInfo::new(cycles, per_cycle_steps, first_posedge);
                 }

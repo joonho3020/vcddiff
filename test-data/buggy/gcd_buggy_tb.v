@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 
-module gcd_buggy_tb;
+module gcd_tb;
     reg clk;
     reg reset;
     reg start;
@@ -10,7 +10,7 @@ module gcd_buggy_tb;
     wire done;
 
     // Instantiate buggy GCD module
-    gcd_buggy uut (
+    gcd uut (
         .clk(clk),
         .reset(reset),
         .start(start),
@@ -30,7 +30,7 @@ module gcd_buggy_tb;
     initial begin
         // Initialize VCD dump
         $dumpfile("gcd_buggy.vcd");
-        $dumpvars(0, gcd_buggy_tb);
+        $dumpvars(0, gcd_tb);
 
         // Initialize signals
         reset = 1;
