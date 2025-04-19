@@ -1,78 +1,82 @@
 pub mod vcdparser;
 
-use structopt::StructOpt;
+use clap::Parser;
 use vcdparser::*;
+use std::cmp::min;
 
-#[derive(StructOpt)]
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
 struct Opts {
     /// Path to the first VCD file
-    #[structopt(parse(from_os_str))]
+    #[arg(long)]
     vcd1: std::path::PathBuf,
 
     /// Path to the second VCD file
-    #[structopt(parse(from_os_str))]
+    #[arg(long)]
     vcd2: std::path::PathBuf,
 
     /// Optional scope to restrict comparison (e.g., top.module1)
-    #[structopt(long)]
+    #[arg(long)]
     scope: Option<String>,
+
+    /// Top level clock signal
+    #[arg(long)]
+    clock: String,
+
+    /// Top level reset signal
+    #[arg(long)]
+    reset: String,
 }
 
 fn main() {
-    let opts = Opts::from_args();
+    let opts = Opts::parse();
 
     // Load VCD files using the wrapper
     let mut vcd1 = WaveformDB::new(&opts.vcd1.to_string_lossy().to_string());
     let mut vcd2 = WaveformDB::new(&opts.vcd2.to_string_lossy().to_string());
 
-    // Get the signal values at cycle 0 (or you could iterate through cycles if needed)
-    let signals1 = vcd1.signal_values_at_cycle(0);
-    let signals2 = vcd2.signal_values_at_cycle(0);
+    let time1 = vcd1.clock_cycles(&opts.clock);
+    let time2 = vcd2.clock_cycles(&opts.clock);
 
-    // Filter signals based on scope if provided
-    let scope_prefix = opts.scope.as_deref().unwrap_or("");
+    let total_cycles = min(time1.tot_cycles, time2.tot_cycles);
 
-    // Compare signals and report differences
-    let mut found_differences = false;
+    for cycle in 0..total_cycles {
+        let step1 = time1.offset + cycle * time1.per_cycle_steps;
+        let step2 = time2.offset + cycle * time2.per_cycle_steps;
 
-    for (signal1, value1) in signals1.iter() {
-        let signal_path = signal1.to_string();
-        if !signal_path.starts_with(scope_prefix) {
-            continue;
-        }
+        let signals1 = vcd1.signal_values_at_cycle(step1 as u32);
+        let signals2 = vcd2.signal_values_at_cycle(step2 as u32);
 
-        match signals2.get(signal1) {
-            Some(value2) => {
-                if value1 != value2 {
+        // Filter signals based on scope if provided
+        let scope_prefix = opts.scope.as_deref().unwrap_or("");
+
+        // Compare signals and report differences
+        let mut found_differences = false;
+
+        for (signal1, value1) in signals1.iter() {
+            let signal_path = signal1.to_string();
+            if !signal_path.starts_with(scope_prefix) {
+                continue;
+            }
+
+            match signals2.get(signal1) {
+                Some(value2) => {
+                    if value1 != value2 {
+                        found_differences = true;
+                        println!("signal {:?}:  {:?} vs {:?}", signal1, value1, value2);
+                        break;
+                    }
+                }
+                None => {
                     found_differences = true;
-                    println!("Signal '{}' differs:", signal_path);
-                    println!("  File 1: {:?}", value1);
-                    println!("  File 2: {:?}", value2);
+                    println!("Signal '{}' only exists in first file", signal_path);
                 }
             }
-            None => {
-                found_differences = true;
-                println!("Signal '{}' only exists in first file", signal_path);
-            }
         }
-    }
 
-    // Check for signals that only exist in the second file
-    for (signal2, _) in signals2.iter() {
-        let signal_path = signal2.to_string();
-        if !signal_path.starts_with(scope_prefix) {
-            continue;
-        }
-        if !signals1.contains_key(signal2) {
-            found_differences = true;
-            println!("Signal '{}' only exists in second file", signal_path);
+        if found_differences {
+            break;
         }
     }
-
-    if !found_differences {
-        println!("No differences found between the VCD files");
-        if !scope_prefix.is_empty() {
-            println!("(within scope '{}')", scope_prefix);
-        }
-    }
+    println!("Success, no difference found!");
 }

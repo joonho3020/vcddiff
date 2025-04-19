@@ -11,6 +11,19 @@ pub type Bit = u8;
 pub type SignalMap = IndexMap<WaveformSignal, FourStateBit>;
 
 #[derive(Debug, Clone, Default, PartialEq)]
+pub struct TimeStampInfo {
+    pub tot_cycles: wellen::Time,
+    pub per_cycle_steps: wellen::Time,
+    pub offset: wellen::Time
+}
+
+impl TimeStampInfo {
+    pub fn new(tot_cycles: wellen::Time, per_cycle_steps: wellen::Time, offset: wellen::Time) -> Self {
+        Self { tot_cycles, per_cycle_steps, offset }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
 pub enum FourStateBit {
     #[default]
     ZERO,
@@ -248,5 +261,56 @@ impl WaveformDB {
             ret.insert(WaveformSignal::new(signal_path), loaded_signal);
         }
         return ret;
+    }
+
+    /// Returns the number of clock cycles in the waveform by counting rising edges of the clock signal
+    /// The clock_path should be the full hierarchical path to the clock signal (e.g., "top.clk" or "gcd_tb.clk")
+    pub fn clock_cycles(&mut self, clock_path: &str) -> TimeStampInfo {
+        let hierarchy = &self.header.hierarchy;
+
+        // Find the clock signal
+        for var in hierarchy.iter_vars() {
+            let signal_name = var.full_name(&hierarchy);
+            if signal_name == clock_path {
+                let ids = [var.signal_ref(); 1];
+                let loaded = self
+                    .body
+                    .source
+                    .load_signals(&ids, &hierarchy, LOAD_OPTS.multi_thread);
+
+                if let Some((_, loaded_signal)) = loaded.into_iter().next() {
+                    let mut cycles = 0;
+                    let mut last_value = FourStateBit::X;
+                    let mut current_offset = 0;
+                    let mut per_cycle_steps = 0;
+                    let mut last_posedge = 0;
+                    let mut first_posedge = 0;
+                    let mut found_first_posedge = false;
+
+                    // Count rising edges (transitions from 0 to 1)
+                    while let Some(idx) = loaded_signal.get_offset(current_offset) {
+                        if let Some(sig_val) = loaded_signal.get_value_at(&idx, 0).to_bit_string() {
+                            let current_value = FourStateBit::from_char(sig_val.chars().next().unwrap_or('x'));
+
+                            // Check for rising edge (0 to 1 transition)
+                            if last_value == FourStateBit::ZERO && current_value == FourStateBit::ONE {
+                                cycles += 1;
+                                per_cycle_steps = current_offset as wellen::Time - last_posedge;
+                                last_posedge = current_offset as wellen::Time;
+
+                                if !found_first_posedge {
+                                    first_posedge = current_offset as wellen::Time;
+                                    found_first_posedge = true;
+                                }
+                            }
+                            last_value = current_value;
+                        }
+                        current_offset += 1;
+                    }
+                    return TimeStampInfo::new(cycles, per_cycle_steps, first_posedge);
+                }
+            }
+        }
+        TimeStampInfo::default()
     }
 }
