@@ -21,17 +21,15 @@
             },
             "args": [
                 "--vcd1",
-                "test-data/gcd.vcd",
+                "test-data/hello.golden.vcd",
                 "--vcd2",
-                "test-data/gcd_buggy.vcd",
-                "--clock1",
-                "gcd_tb.clk",
-                "--reset1",
-                "gcd_tb.reset",
-                "--clock2",
-                "gcd_buggy_tb.clk",
-                "--reset2",
-                "gcd_buggy_tb.reset"
+                "test-data/hello.impl.vcd",
+                "--clock",
+                "TestDriver.testHarness.chiptop0.system.auto_chipyard_prcictrl_domain_reset_setter_clock_in_member_allClocks_uncore_clock",
+                "--reset",
+                "TestDriver.testHarness.chiptop0.system.auto_chipyard_prcictrl_domain_reset_setter_clock_in_member_allClocks_uncore_reset",
+                "--scope",
+                "TestDriver.testHarness.chiptop0.system"
             ],
             "cwd": "${workspaceFolder}"
         }

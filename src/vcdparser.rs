@@ -283,22 +283,12 @@ impl WaveformDB {
         return ret;
     }
 
-    pub fn hierarchy_to_signal(self: &mut Self) -> IndexMap<WaveformSignal, wellen::Signal> {
+    pub fn print_hierarchy(&self) {
         let hierarchy = &self.header.hierarchy;
-        let mut ret: IndexMap<WaveformSignal, wellen::Signal> = IndexMap::new();
         for var in hierarchy.iter_vars() {
-            let _signal_name: String = var.full_name(&hierarchy);
-            let ids = [var.signal_ref(); 1];
-            let loaded = self
-                .body
-                .source
-                .load_signals(&ids, &hierarchy, LOAD_OPTS.multi_thread);
-            println!("_signal_name: {:?}", _signal_name);
-            let (_, loaded_signal) = loaded.into_iter().next().unwrap();
-            let signal_path: Vec<String> = _signal_name.split('.').map(|s| s.to_string()).collect();
-            ret.insert(WaveformSignal::new(signal_path), loaded_signal);
+            let signal_name: String = var.full_name(&hierarchy);
+            println!("signal_name {:?}", signal_name);
         }
-        return ret;
     }
 
     /// Returns the number of clock cycles in the waveform by counting rising edges of the clock signal

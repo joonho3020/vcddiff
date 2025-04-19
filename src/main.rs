@@ -4,6 +4,7 @@ use clap::Parser;
 use vcdparser::*;
 use std::{cmp::min, io::Read};
 use gag::BufferRedirect;
+use indicatif::{ProgressBar, ProgressStyle};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -27,6 +28,9 @@ struct Opts {
     /// Top level reset signal
     #[arg(long)]
     reset: String,
+
+    #[arg(long)]
+    print_hier: bool,
 }
 
 fn get_vcd(opts: &Opts) -> (WaveformDB, WaveformDB) {
@@ -38,6 +42,7 @@ fn get_vcd(opts: &Opts) -> (WaveformDB, WaveformDB) {
 fn main() {
     let opts = Opts::parse();
 
+    println!("{:#?}", opts);
     let (mut vcd1, mut vcd2) = {
         let mut buf = BufferRedirect::stdout().unwrap();
 
@@ -50,6 +55,10 @@ fn main() {
         ret
     };
 
+    if opts.print_hier {
+        vcd1.print_hierarchy();
+    }
+
     let time1 = vcd1.clock_cycles(&opts.clock);
     let time2 = vcd2.clock_cycles(&opts.clock);
 
@@ -59,9 +68,17 @@ fn main() {
     println!("time2 {:?}", time2);
     println!("total_cycle {:?}", total_cycles);
 
+    // Setup progress bar
+    let pb = ProgressBar::new(total_cycles);
+    pb.set_style(ProgressStyle::default_bar()
+        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} cycles ({eta})")
+        .unwrap()
+        .progress_chars("#>-"));
+
     // Compare signals and report differences
     let mut found_differences = false;
     for cycle in 0..total_cycles {
+        pb.inc(1);
         let step1 = time1.offset + cycle * time1.per_cycle_steps;
         let step2 = time2.offset + cycle * time2.per_cycle_steps;
 
@@ -96,6 +113,7 @@ fn main() {
             break;
         }
     }
+    pb.finish();
     if !found_differences {
         println!("Success, no difference found!");
     } else {
