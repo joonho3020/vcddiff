@@ -2,7 +2,7 @@ pub mod vcdparser;
 
 use clap::Parser;
 use vcdparser::*;
-use std::{cmp::min, io::Read};
+use std::{cmp::min, io::Read, collections::HashMap};
 use gag::BufferRedirect;
 use indicatif::{ProgressBar, ProgressStyle};
 
@@ -59,6 +59,11 @@ fn main() {
         vcd1.print_hierarchy();
     }
 
+    // Pre-load signals for both waveforms
+    println!("Pre-loading signals from VCD files...");
+    vcd1.preload_signals();
+    vcd2.preload_signals();
+
     let time1 = vcd1.clock_cycles(&opts.clock);
     let time2 = vcd2.clock_cycles(&opts.clock);
 
@@ -75,8 +80,11 @@ fn main() {
         .unwrap()
         .progress_chars("#>-"));
 
+    // Track first divergence point for each signal
+    let mut first_divergence: HashMap<WaveformSignal, (u64, FourStateBit, FourStateBit)> = HashMap::new();
+    let scope_prefix = opts.scope.as_deref().unwrap_or("");
+
     // Compare signals and report differences
-    let mut found_differences = false;
     for cycle in 0..total_cycles {
         pb.inc(1);
         let step1 = time1.offset + cycle * time1.per_cycle_steps;
@@ -84,9 +92,6 @@ fn main() {
 
         let signals1 = vcd1.signal_values_at_cycle(step1 as u32);
         let signals2 = vcd2.signal_values_at_cycle(step2 as u32);
-
-        // Filter signals based on scope if provided
-        let scope_prefix = opts.scope.as_deref().unwrap_or("");
 
         for (signal1, value1) in signals1.iter() {
             let signal_path = signal1.to_string();
@@ -96,27 +101,52 @@ fn main() {
 
             match signals2.get(signal1) {
                 Some(value2) => {
-                    if value1 != value2 {
-                        found_differences = true;
-                        println!("cycle {:?} {:?}:  {:?} vs {:?}", cycle, signal1, value1, value2);
-                        break;
+                    if value1 != value2 && !first_divergence.contains_key(signal1) {
+                        first_divergence.insert(
+                            signal1.clone(),
+                            (cycle, value1.clone(), value2.clone())
+                        );
                     }
                 }
                 None => {
-                    found_differences = true;
-                    println!("Signal '{}' only exists in first file", signal_path);
+                    if !first_divergence.contains_key(signal1) {
+                        println!("Signal '{}' only exists in first file", signal_path);
+                        first_divergence.insert(
+                            signal1.clone(),
+                            (cycle, value1.clone(), FourStateBit::X)
+                        );
+                    }
                 }
             }
         }
 
-        if found_differences {
-            break;
+        // Check for signals that only exist in the second file
+        for (signal2, value2) in signals2.iter() {
+            let signal_path = signal2.to_string();
+            if !signal_path.starts_with(scope_prefix) {
+                continue;
+            }
+
+            if !signals1.contains_key(signal2) && !first_divergence.contains_key(signal2) {
+                println!("Signal '{}' only exists in second file", signal_path);
+                first_divergence.insert(
+                    signal2.clone(),
+                    (cycle, FourStateBit::X, value2.clone())
+                );
+            }
         }
     }
     pb.finish();
-    if !found_differences {
-        println!("Success, no difference found!");
+
+    // Report all divergences
+    if first_divergence.is_empty() {
+        println!("Success, no differences found!");
     } else {
-        println!("Difference found 😢");
+        println!("\nFound differences in {} signals:", first_divergence.len());
+        for (signal, (cycle, val1, val2)) in first_divergence.iter() {
+            println!("Signal '{}' first diverged at cycle {}: {:?} vs {:?}", 
+                signal.to_string(), cycle, val1, val2);
+        }
+        std::process::exit(1);
     }
 }

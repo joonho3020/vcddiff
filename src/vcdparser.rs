@@ -150,6 +150,7 @@ const LOAD_OPTS: LoadOptions = LoadOptions {
 pub struct WaveformDB {
     pub header: viewers::HeaderResult,
     pub body: viewers::BodyResult,
+    cached_signals: Option<Vec<(WaveformSignal, Signal)>>,
 }
 
 impl WaveformDB {
@@ -208,34 +209,49 @@ impl WaveformDB {
         return WaveformDB {
             header: header2,
             body: body_,
+            cached_signals: None,
         };
     }
 
-    /// Returns a signal name to bit value map for all signals at `cycle`
-    pub fn signal_values_at_cycle(self: &mut Self, cycle: u32) -> SignalMap {
-        let mut ret: SignalMap = SignalMap::new();
-
+    /// Pre-loads all signals to avoid repeated loading during comparison
+    pub fn preload_signals(&mut self) {
         let hierarchy = &self.header.hierarchy;
+        let mut signals = Vec::new();
+
         for var in hierarchy.iter_vars() {
-            let _signal_name: String = var.full_name(&hierarchy);
+            let signal_name = var.full_name(&hierarchy);
             let ids = [var.signal_ref(); 1];
             let loaded = self
                 .body
                 .source
                 .load_signals(&ids, &hierarchy, LOAD_OPTS.multi_thread);
             let (_, loaded_signal) = loaded.into_iter().next().unwrap();
+            signals.push((WaveformSignal::from(signal_name), loaded_signal));
+        }
 
+        self.cached_signals = Some(signals);
+    }
+
+    /// Returns a signal name to bit value map for all signals at `cycle`
+    pub fn signal_values_at_cycle(self: &mut Self, cycle: u32) -> SignalMap {
+        let mut ret: SignalMap = SignalMap::new();
+
+        let signals = if let Some(ref cached) = self.cached_signals {
+            cached
+        } else {
+            self.preload_signals();
+            self.cached_signals.as_ref().unwrap()
+        };
+
+        for (signal, loaded_signal) in signals {
             let offset = loaded_signal.get_offset(cycle as u32);
             match offset {
                 Some(idx) => {
                     for elemidx in 0..idx.elements {
-                        let signal_path: Vec<String> = _signal_name.split('.').map(|s| s.to_string()).collect();
                         let sig_val = loaded_signal.get_value_at(&idx, elemidx);
                         let numbits = match sig_val.bits() {
                             Some(x) => x,
-                            _ => {
-                                continue;
-                            },
+                            _ => continue,
                         };
                         let bits = match sig_val.to_bit_string() {
                             Some(bits_as_string) => bits_as_string,
@@ -250,13 +266,13 @@ impl WaveformDB {
                         } else {
                             FourStateBit::from_string(bits.chars().rev().collect())
                         };
-                        ret.insert(WaveformSignal::new(signal_path), val);
+                        ret.insert(signal.clone(), val);
                     }
                 }
                 _ => {}
             }
         }
-        return ret;
+        ret
     }
 
     pub fn signal_values_at_cycle_rebase_top(self: &mut Self, cycle: u32, instance_path: String) -> IndexMap<String, FourStateBit> {

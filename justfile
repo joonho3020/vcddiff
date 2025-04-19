@@ -31,3 +31,12 @@ clean_build:
 
 [group: 'clean']
 clean_all: clean clean_build
+
+[group: 'profile']
+flamegraph:
+    CARGO_PROFILE_RELEASE_DEBUG=true cargo flamegraph --bin vcddiff -- \
+        --vcd1 test-data/hello.golden.vcd \
+        --vcd2 test-data/hello.impl.vcd \
+        --clock TestDriver.testHarness.chiptop0.system.auto_chipyard_prcictrl_domain_reset_setter_clock_in_member_allClocks_uncore_clock \
+        --reset TestDriver.testHarness.chiptop0.system.auto_chipyard_prcictrl_domain_reset_setter_clock_in_member_allClocks_uncore_reset \
+        --scope TestDriver.testHarness.chiptop0.system
