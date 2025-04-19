@@ -120,7 +120,7 @@ fn main() {
             }
         }
 
-        if first_divergence.len() > 100 {
+        if first_divergence.len() > 10 {
             break;
         }
     }
