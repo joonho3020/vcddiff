@@ -4,5 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-wellen = "0.4"
+wellen = "0.9.14"
 structopt = "0.3"
+indexmap = "2.9.0"
+indicatif = "0.17.11"
+itertools = "0.14.0"
