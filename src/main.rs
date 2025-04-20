@@ -29,8 +29,17 @@ struct Opts {
     #[arg(long)]
     reset: String,
 
+    /// Print the hierarchy in the VCD file
     #[arg(long)]
     print_hier: bool,
+
+    /// Ignore comparing X
+    #[arg(long)]
+    ignore_x: bool,
+
+    /// Skip cycles
+    #[arg(long, default_value = "0")]
+    skip: u64,
 }
 
 fn get_vcd(opts: &Opts) -> (WaveformDB, WaveformDB) {
@@ -85,7 +94,7 @@ fn main() {
     let scope_prefix = opts.scope.as_deref().unwrap_or("");
 
     // Compare signals and report differences
-    for cycle in 0..total_cycles {
+    for cycle in opts.skip..total_cycles {
         pb.inc(1);
         let step1 = time1.offset + cycle * time1.per_cycle_steps;
         let step2 = time2.offset + cycle * time2.per_cycle_steps;
@@ -95,13 +104,27 @@ fn main() {
 
         for (signal1, value1) in signals1.iter() {
             let signal_path = signal1.to_string();
-            if !signal_path.starts_with(scope_prefix) {
+            if !signal_path.starts_with(scope_prefix) ||
+                signal1.to_string().contains("_GEN") || // Chisel specific
+                signal1.to_string().contains("_T")      // Chisel specific
+            {
                 continue;
             }
 
             match signals2.get(signal1) {
                 Some(value2) => {
                     if value1 != value2 && !first_divergence.contains_key(signal1) {
+                        if opts.ignore_x {
+                            match (value1, value2) {
+                                (&FourStateBit::X, _) |
+                                    (_, &FourStateBit::X) |
+                                    (FourStateBit::MultiX(..), _) |
+                                    (_, FourStateBit::MultiX(..)) => {
+                                    continue;
+                                }
+                                _ => {}
+                            }
+                        }
                         first_divergence.insert(
                             signal1.clone(),
                             (cycle, value1.clone(), value2.clone())
@@ -109,13 +132,6 @@ fn main() {
                     }
                 }
                 None => {
-                    if !first_divergence.contains_key(signal1) {
-                        println!("Signal '{}' only exists in first file", signal_path);
-                        first_divergence.insert(
-                            signal1.clone(),
-                            (cycle, value1.clone(), FourStateBit::X)
-                        );
-                    }
                 }
             }
         }
