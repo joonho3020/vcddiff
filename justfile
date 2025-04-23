@@ -40,3 +40,9 @@ flamegraph:
         --clock TestDriver.testHarness.chiptop0.system.auto_chipyard_prcictrl_domain_reset_setter_clock_in_member_allClocks_uncore_clock \
         --reset TestDriver.testHarness.chiptop0.system.auto_chipyard_prcictrl_domain_reset_setter_clock_in_member_allClocks_uncore_reset \
         --scope TestDriver.testHarness.chiptop0.system
+
+[group: 'publish']
+publish:
+  cargo release patch
+  cargo package
+  cargo publish

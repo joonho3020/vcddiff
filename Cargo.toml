@@ -2,6 +2,11 @@
 name = "vcddiff"
 version = "0.1.0"
 edition = "2021"
+authors = ["Joonho Whangbo <joonho.whangbo@berkeley.edu>"]
+description = "A Rust library that can compare two VCD files and point to sources of divergence"
+repository = "https://github.com/joonho3020/vcddiff.git"
+readme = "README.md"
+license = "MIT"
 
 [dependencies]
 wellen = "0.9.14"
